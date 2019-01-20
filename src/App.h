@@ -12,10 +12,14 @@
 
 class App {
     public:
-        Error setup();
+        App(const std::filesystem::path& out_dir);
+        Error setup(std::filesystem::path vert_path, std::filesystem::path frag_path);
         void draw(GLFWwindow* window, float t);
-        static void onError(int error, const char* desc);
-        static void onWindowSize(GLFWwindow* window, int width, int height);
+        void onError(int error, const char* desc);
+        void onWindowSize(GLFWwindow* window, int width, int height);
+        void onKey(GLFWwindow* window, int key, int scancode, int action, int mods);
+        Error writeFBO(GLFWwindow* window, const std::filesystem::path& path);
+        Error screenshot(GLFWwindow* window);
 
     private:
         GLuint ebo = 0;
@@ -24,6 +28,7 @@ class App {
 
         std::unique_ptr<ShaderProgram> program_;
         std::string last_err_ = "";
+        const std::filesystem::path out_dir_;
 };
 
 #endif

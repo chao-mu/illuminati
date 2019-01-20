@@ -46,7 +46,10 @@ Error ShaderProgram::loadShader(GLenum type, const std::string& path) {
         glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &log_length);
         std::vector<char> v(log_length);
         glGetShaderInfoLog(shader, log_length, NULL, v.data());
-        return std::string(begin(v), end(v));
+
+        std::ostringstream err;
+        err << "Error compiling " << path <<  ":\n" << std::string(begin(v), end(v));
+        return err.str();
     }
 
     std::error_code err;
@@ -104,7 +107,9 @@ Error ShaderProgram::update() {
             glGetProgramiv(internal_program_, GL_INFO_LOG_LENGTH, &log_length);
             std::vector<char> v(log_length);
             glGetProgramInfoLog(internal_program_, log_length, NULL, v.data());
-            return std::string(begin(v), end(v));
+            std::ostringstream err;
+            err << "Error linking shader program: \n" << std::string(begin(v), end(v));
+            return err.str();
         }
 
         // Elevate internal program

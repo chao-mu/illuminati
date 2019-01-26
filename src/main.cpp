@@ -7,6 +7,9 @@
 #include <filesystem>
 
 #include "App.h"
+#include "Joystick.h"
+
+// #define BENCHMARK
 
 std::unique_ptr<App> app;
 
@@ -28,12 +31,25 @@ int main(int argc, char** argv) {
     TCLAP::ValueArg<std::string> vert_arg("", "vert", "path to vertex shader", false, "vert.glsl", "string", cmd);
     TCLAP::ValueArg<std::string> frag_arg("", "frag", "path to fragment shader", false, "frag.glsl", "string", cmd);
     TCLAP::ValueArg<std::string> out_arg("", "out-dir", "path to output directory", false, ".", "string", cmd);
+    TCLAP::MultiArg<std::string> joy_arg("j", "joystick", "path to joystick configuration", false, "string", cmd);
 
     try {
         cmd.parse(argc, argv);
     } catch (TCLAP::ArgException &e) {
         std::cerr << "error: " << e.error() << " for arg " << e.argId() << std::endl;
         return 1;
+    }
+
+    std::vector<std::shared_ptr<Joystick>> joysticks;
+    for (const std::string& path : joy_arg.getValue()) {
+        auto joy = std::make_shared<Joystick>();
+        Error err = joy->load(path);
+        if (err) {
+            std::cerr << "Error loading joystick " << path << ": " << path << std::endl;
+            return 1;
+        }
+
+        joysticks.push_back(joy);
     }
 
     std::filesystem::path out_dir = std::filesystem::absolute(out_arg.getValue());
@@ -69,22 +85,38 @@ int main(int argc, char** argv) {
     std::filesystem::path frag_path = std::filesystem::absolute(frag_arg.getValue());
 
     // Setup our app
-    std::optional<std::string> err = app->setup(vert_path, frag_path);
+    std::optional<std::string> err = app->setup(vert_path, frag_path, joysticks);
     if (err.has_value()) {
         std::cerr << "Error initializing app" << std::endl << err.value() << std::endl;
         return 1;
     }
 
+#ifdef BENCHMARK
+    double frames = 0;
+    float last_benchmark = 0;
+#else
     float last_frame = -1;
     float per_frame = 1 / 30.;
+#endif
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
         float t = glfwGetTime();
+
+#ifdef BENCHMARK
+        frames++;
+        app->draw(window, t);
+        if (t - last_benchmark >= 1.0) {
+            printf("%f ms/frame\n", 1000.0/double(frames));
+            frames = 0;
+            last_benchmark = t;
+        }
+#else
         if (last_frame < 0 || t - last_frame > per_frame) {
             app->draw(window, t);
             last_frame = t;
         }
+#endif
 
         glfwSwapBuffers(window);
     }

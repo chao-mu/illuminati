@@ -9,11 +9,13 @@
 
 #include "Result.h"
 #include "ShaderProgram.h"
+#include "Joystick.h"
+#include "JoystickManager.h"
 
 class App {
     public:
         App(const std::filesystem::path& out_dir);
-        Error setup(std::filesystem::path vert_path, std::filesystem::path frag_path);
+        Error setup(std::filesystem::path vert_path, std::filesystem::path frag_path, std::vector<std::shared_ptr<Joystick>> joysticks);
         void draw(GLFWwindow* window, float t);
         void onError(int error, const char* desc);
         void onWindowSize(GLFWwindow* window, int width, int height);
@@ -27,7 +29,10 @@ class App {
         GLuint vbo = 0;
 
         std::unique_ptr<ShaderProgram> program_;
+        std::unique_ptr<JoystickManager> joy_manager_;
+        std::vector<std::shared_ptr<Joystick>> joysticks_;
         std::string last_err_ = "";
+        std::string last_warning_ = "";
         const std::filesystem::path out_dir_;
 };
 

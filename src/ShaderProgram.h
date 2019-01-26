@@ -3,6 +3,7 @@
 
 #include <filesystem>
 #include <map>
+#include <functional>
 
 #include <GL/glew.h>
 
@@ -27,8 +28,14 @@ class ShaderProgram {
         Error update();
         ShaderHandle getProgram();
 
+        std::optional<GLint> getUniformLoc(std::string name);
+        void setUniform(const std::string& name, std::function<void(GLint&)> f);
+        std::vector<std::string> getUnsetUniforms();
+
     private:
         std::map<GLenum, Shader> shaders_;
+        std::map<std::string, GLint> uniforms_;
+        std::vector<GLint> set_uniforms_;
         bool should_switch_ = false;
         ProgramHandle internal_program_;
         ProgramHandle external_program_;

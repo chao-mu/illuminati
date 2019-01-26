@@ -1,0 +1,26 @@
+name: "iNNEXT SNES"
+device: "USB Gamepad"
+
+deadzone: 0
+
+axes:
+    0: "DirX"
+    1: "DirY"
+
+buttons:
+    0: "X"
+    1: "A"
+    2: "B"
+    3: "Y"
+    4: "L"
+    5: "R"
+    8: "Select"
+    9: "Start"
+
+fake_buttons_negative:
+    Up: "DirY"
+    Left: "DirX"
+
+fake_buttons_positive:
+    Down: "DirY"
+    Right: "DirX"

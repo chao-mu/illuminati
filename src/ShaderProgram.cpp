@@ -76,6 +76,31 @@ Error ShaderProgram::loadShader(GLenum type, const std::string& path) {
     return {};
 }
 
+void ShaderProgram::setUniform(const std::string& name, std::function<void(GLint&)> f) {
+    if (!uniforms_.count(name)) {
+        return;
+    }
+
+    GLint id = uniforms_.at(name);
+    f(id);
+
+    set_uniforms_.push_back(id);
+}
+
+std::vector<std::string> ShaderProgram::getUnsetUniforms() {
+    std::vector<std::string> unused;
+    for (const auto& kv : uniforms_) {
+        std::string name = kv.first;
+        GLint id = kv.second;
+
+        if (set_uniforms_.end() == std::find(set_uniforms_.begin(), set_uniforms_.end(), id)) {
+            unused.push_back(name);
+        }
+    }
+
+    return unused;
+}
+
 Error ShaderProgram::update() {
     for (auto const kv : shaders_) {
         std::string path = kv.second.path;
@@ -112,6 +137,25 @@ Error ShaderProgram::update() {
             return err.str();
         }
 
+        GLint uni_name_len = 0;
+        glGetProgramiv(internal_program_, GL_ACTIVE_UNIFORM_MAX_LENGTH, &uni_name_len);
+
+        GLint count;
+        glGetProgramiv(internal_program_, GL_ACTIVE_UNIFORMS, &count);
+        uniforms_.clear();
+        for (GLuint i = 0; i < (GLuint)count; i++)
+        {
+            std::vector<GLchar> name(uni_name_len);
+
+            GLsizei length;
+            GLint size;
+            GLenum type;
+            glGetActiveUniform(internal_program_, i, uni_name_len, &length, &size, &type, &name[0]);
+
+            GLint loc = glGetUniformLocation(internal_program_, name.data());
+            uniforms_[std::string(name.data())] = loc;
+        }
+
         // Elevate internal program
         glDeleteProgram(external_program_);
         external_program_ = internal_program_;
@@ -120,9 +164,20 @@ Error ShaderProgram::update() {
         should_switch_ = false;
     }
 
+    set_uniforms_.clear();
+
     return {};
+}
+
+std::optional<GLint> ShaderProgram::getUniformLoc(std::string name) {
+    if (!uniforms_.count(name)) {
+        return {};
+    }
+
+    return uniforms_.at(name);
 }
 
 GLuint ShaderProgram::getProgram() {
     return external_program_;
 }
+#undef MAX_UNIFORM_NAME_LEN

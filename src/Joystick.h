@@ -8,18 +8,18 @@
 
 struct JoystickOutput {
     float value = 0;
-    float time = 0;
-    float time_total = 0;
+    double time = 0;
+    double time_total = 0;
     bool pressed = false;
     bool pressed_new = false;
-    float last_time_total = 0;
+    double last_time_total = 0;
 };
 
 class Joystick {
     public:
         Error load(const std::string& path);
 
-        void update(float t);
+        void update(double t);
 
         bool isCompatible(int glfw_id);
         void connect(int glfw_id);
@@ -33,12 +33,12 @@ class Joystick {
         const std::map<std::string, JoystickOutput>& getOutputs() const;
 
     private:
-        void setJoystickOutput(const std::string& name, bool pressed, float t, float v);
+        void setJoystickOutput(const std::string& name, bool pressed, double t, float v);
 
         bool isAxisPressed(const float* axes, int i, int sibling=-1);
         int getStickSibling(int i);
 
-        std::map<std::string, float> press_start_;
+        std::map<std::string, double> press_start_;
         int glfw_id_ = -1;
 
         std::string device_;

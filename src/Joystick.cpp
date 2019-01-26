@@ -37,7 +37,7 @@ Error Joystick::load(const std::string& path) {
     }
 
     for (YAML::const_iterator it=config["stick_siblings"].begin(); it != config["stick_siblings"].end(); ++it) {
-        stick_siblings_[it->first.as<int>()] = it->second.as<float>();
+        stick_siblings_[it->first.as<int>()] = it->second.as<int>();
     }
 
     for (YAML::const_iterator it=config["axes"].begin(); it != config["axes"].end(); ++it) {
@@ -72,7 +72,7 @@ Error Joystick::load(const std::string& path) {
     return {};
 }
 
-void Joystick::setJoystickOutput(const std::string& name, bool pressed, float t, float v) {
+void Joystick::setJoystickOutput(const std::string& name, bool pressed, double t, float v) {
     //printf("%s: %i %f %f\n", name.c_str(), pressed, t, v);
     JoystickOutput& output = outputs_.at(name);
     if (pressed) {
@@ -102,7 +102,7 @@ void Joystick::setJoystickOutput(const std::string& name, bool pressed, float t,
     }
 }
 
-void Joystick::update(float t) {
+void Joystick::update(double t) {
     if (glfwJoystickPresent(glfw_id_) != GLFW_TRUE) {
         return;
     }

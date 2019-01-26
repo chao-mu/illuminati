@@ -16,7 +16,7 @@ class App {
     public:
         App(const std::filesystem::path& out_dir);
         Error setup(std::filesystem::path vert_path, std::filesystem::path frag_path, std::vector<std::shared_ptr<Joystick>> joysticks);
-        void draw(GLFWwindow* window, float t);
+        void draw(GLFWwindow* window, double t);
         void onError(int error, const char* desc);
         void onWindowSize(GLFWwindow* window, int width, int height);
         void onKey(GLFWwindow* window, int key, int scancode, int action, int mods);

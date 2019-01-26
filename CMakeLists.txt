@@ -7,10 +7,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
 # My stuff
-add_executable(demo src/main.cpp src/App.cpp src/MathUtil.cpp src/JoystickManager.cpp src/Joystick.cpp src/Result.cpp src/ShaderProgram.cpp thirdparty/lodepng/lodepng.cpp)
+add_executable(demo src/main.cpp src/App.cpp src/MathUtil.cpp src/JoystickManager.cpp src/Joystick.cpp src/Result.cpp src/ShaderProgram.cpp)
 target_include_directories(demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} "${CMAKE_SOURCE_DIR}/thirdparty/lodepng")
-target_compile_options(demo PRIVATE "-Wextra" "-Werror" "-Wall" "-pedantic-errors")
+target_compile_options(demo PRIVATE "-Wextra" "-Werror" "-Wall" "-pedantic-errors" "-Wconversion")
 target_link_libraries(demo stdc++fs)
+
+# LodePNG
+add_subdirectory("${CMAKE_SOURCE_DIR}/thirdparty/lodepng")
+target_link_libraries(demo lodepng)
 
 # OpenGL
 find_package(OpenGL REQUIRED COMPONENTS OpenGL)
@@ -25,7 +29,6 @@ target_link_libraries(demo glfw ${GLFW_LIBRARIES})
 find_package(GLEW REQUIRED)
 include_directories(${GLEW_INCLUDE_DIRS})
 target_link_libraries(demo ${GLEW_LIBRARIES})
-
 
 # TCLAP
 find_package(TCLAP REQUIRED)

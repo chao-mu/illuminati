@@ -107,7 +107,7 @@ std::optional<std::string> App::setup(
     return {};
 }
 
-void App::draw(GLFWwindow* window, float t) {
+void App::draw(GLFWwindow* window, double t) {
     joy_manager_->update();
     for (auto& joy : joysticks_) {
         joy->update(t);
@@ -133,11 +133,11 @@ void App::draw(GLFWwindow* window, float t) {
     glfwGetWindowSize(window, &width, &height);
 
     program_->setUniform("iResolution", [width, height, program](GLint& id) {
-        glProgramUniform2f(program, id, width, height);
+        glProgramUniform2f(program, id, (float)width, (float)height);
     });
 
     program_->setUniform("iTime", [t, program](GLint& id) {
-        glProgramUniform1f(program, id, t);
+        glProgramUniform1f(program, id, (float)t);
     });
 
     int i = 1;
@@ -157,11 +157,11 @@ void App::draw(GLFWwindow* window, float t) {
             });
 
             program_->setUniform(base + "Time", [ctrl, program](GLint& id) {
-                glProgramUniform1f(program, id, ctrl.time);
+                glProgramUniform1f(program, id, (float)ctrl.time);
             });
 
             program_->setUniform(base + "TimeTotal", [ctrl, program](GLint& id) {
-                glProgramUniform1f(program, id, ctrl.time_total);
+                glProgramUniform1f(program, id, (float)ctrl.time_total);
             });
 
             program_->setUniform(base, [ctrl, program](GLint& id) {

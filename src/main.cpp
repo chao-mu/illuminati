@@ -95,13 +95,13 @@ int main(int argc, char** argv) {
     double frames = 0;
     float last_benchmark = 0;
 #else
-    float last_frame = -1;
-    float per_frame = 1 / 30.;
+    double last_frame = -1;
+    double per_frame = 1 / 30.;
 #endif
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
-        float t = glfwGetTime();
+        double t = glfwGetTime();
 
 #ifdef BENCHMARK
         frames++;

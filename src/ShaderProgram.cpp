@@ -8,17 +8,14 @@
 
 #include <GLFW/glfw3.h>
 
-ShaderProgram::ShaderProgram() :
-    internal_program_(glCreateProgram()), external_program_(glCreateProgram()) {}
+ShaderProgram::ShaderProgram() : program_(glCreateProgram()) {}
 
 ShaderProgram::~ShaderProgram() {
     for (const auto& kv : shaders_) {
         glDeleteShader(kv.second.handle);
     }
 
-    for (const auto& prog : {internal_program_, external_program_}) {
-        glDeleteProgram(prog);
-    }
+    glDeleteProgram(program_);
 }
 
 Error ShaderProgram::loadShader(GLenum type, const std::string& path) {
@@ -69,11 +66,16 @@ Error ShaderProgram::loadShader(GLenum type, const std::string& path) {
     obj.path = path;
     obj.type = type;
 
-    glAttachShader(internal_program_, shader);
-
     should_switch_ = true;
 
     return {};
+}
+
+void ShaderProgram::markUniformInUse(const std::string& name) {
+    std::optional<GLint> loc = getUniformLoc(name);
+    if (loc) {
+        set_uniforms_.push_back(loc.value());
+    }
 }
 
 void ShaderProgram::setUniform(const std::string& name, std::function<void(GLint&)> f) {
@@ -123,25 +125,30 @@ Error ShaderProgram::update() {
     }
 
     if (should_switch_) {
-        glLinkProgram(internal_program_);
+        ProgramHandle next_prog = glCreateProgram();
+        for (const auto& kv : shaders_) {
+            glAttachShader(next_prog, kv.second.handle);
+        }
+
+        glLinkProgram(next_prog);
 
         int status = 0;
-        glGetProgramiv(internal_program_, GL_LINK_STATUS, &status);
+        glGetProgramiv(next_prog, GL_LINK_STATUS, &status);
         if (!status) {
             GLint log_length = 0;
-            glGetProgramiv(internal_program_, GL_INFO_LOG_LENGTH, &log_length);
+            glGetProgramiv(next_prog, GL_INFO_LOG_LENGTH, &log_length);
             std::vector<char> v(log_length);
-            glGetProgramInfoLog(internal_program_, log_length, NULL, v.data());
+            glGetProgramInfoLog(next_prog, log_length, NULL, v.data());
             std::ostringstream err;
             err << "Error linking shader program: \n" << std::string(begin(v), end(v));
             return err.str();
         }
 
         GLint uni_name_len = 0;
-        glGetProgramiv(internal_program_, GL_ACTIVE_UNIFORM_MAX_LENGTH, &uni_name_len);
+        glGetProgramiv(next_prog, GL_ACTIVE_UNIFORM_MAX_LENGTH, &uni_name_len);
 
         GLint count;
-        glGetProgramiv(internal_program_, GL_ACTIVE_UNIFORMS, &count);
+        glGetProgramiv(next_prog, GL_ACTIVE_UNIFORMS, &count);
         uniforms_.clear();
         for (GLuint i = 0; i < (GLuint)count; i++)
         {
@@ -150,16 +157,15 @@ Error ShaderProgram::update() {
             GLsizei length;
             GLint size;
             GLenum type;
-            glGetActiveUniform(internal_program_, i, uni_name_len, &length, &size, &type, &name[0]);
+            glGetActiveUniform(next_prog, i, uni_name_len, &length, &size, &type, &name[0]);
 
-            GLint loc = glGetUniformLocation(internal_program_, name.data());
+            GLint loc = glGetUniformLocation(next_prog, name.data());
             uniforms_[std::string(name.data())] = loc;
         }
 
-        // Elevate internal program
-        glDeleteProgram(external_program_);
-        external_program_ = internal_program_;
-        internal_program_ = glCreateProgram();
+        // Change out the program
+        glDeleteProgram(program_);
+        program_ = next_prog;
 
         should_switch_ = false;
     }
@@ -178,6 +184,6 @@ std::optional<GLint> ShaderProgram::getUniformLoc(std::string name) {
 }
 
 GLuint ShaderProgram::getProgram() {
-    return external_program_;
+    return program_;
 }
 #undef MAX_UNIFORM_NAME_LEN

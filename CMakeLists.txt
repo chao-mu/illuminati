@@ -4,10 +4,12 @@ project (demo)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
+
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
 # My stuff
-add_executable(demo src/main.cpp src/App.cpp src/MathUtil.cpp src/JoystickManager.cpp src/Joystick.cpp src/Result.cpp src/ShaderProgram.cpp)
+add_executable(demo src/main.cpp src/App.cpp src/MathUtil.cpp src/JoystickManager.cpp src/Joystick.cpp src/Result.cpp src/ShaderProgram.cpp src/Webcam.cpp)
 target_include_directories(demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} "${CMAKE_SOURCE_DIR}/thirdparty/lodepng")
 target_compile_options(demo PRIVATE "-Wextra" "-Werror" "-Wall" "-pedantic-errors" "-Wconversion")
 target_link_libraries(demo stdc++fs)
@@ -23,8 +25,7 @@ add_dependencies(demo OpenGL::OpenGL)
 
 # OpenGL - GLFW
 find_package(glfw3 3.2 REQUIRED)
-target_link_libraries(demo glfw ${GLFW_LIBRARIES})
-
+target_link_libraries(demo glfw ${GLFW_LIBRARIES}) 
 # OpenGL - GLEW
 find_package(GLEW REQUIRED)
 include_directories(${GLEW_INCLUDE_DIRS})
@@ -39,3 +40,8 @@ target_link_libraries(demo ${TCLAP_LIBRARIES})
 find_package(yaml-cpp REQUIRED)
 include_directories(${YAML_CPP_INCLUDE_DIRS})
 target_link_libraries(demo ${YAML_CPP_LIBRARIES})
+
+# OpenCV
+find_package(OpenCV REQUIRED)
+include_directories( ${OpenCV_INCLUDE_DIRS} )
+target_link_libraries(demo ${OpenCV_LIBS})

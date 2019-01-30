@@ -49,6 +49,20 @@ Error App::screenshot(GLFWwindow* window) {
     return {};
 }
 
+bool App::setupWebcam(int dev) {
+    if (!webcam_) {
+        webcam_ = std::make_unique<Webcam>(dev);
+    }
+
+    Error err = webcam_->startIf();
+    if (err) {
+        std::cerr << "Error opening webcam: " << err.value() << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
 std::optional<std::string> App::setup(
         std::filesystem::path vert_path,
         std::filesystem::path frag_path,
@@ -59,37 +73,6 @@ std::optional<std::string> App::setup(
     for (auto& joy : joysticks) {
         joy_manager_->addJoystick(joy);
     }
-
-    glGenVertexArrays(1, &vao);
-    glGenBuffers(1, &vbo);
-    glGenBuffers(1, &ebo);
-
-    GLfloat vertices[] = {
-        1.0f,  1.0f, 0.0f,  // top right
-        1.0f, -1.0f, 0.0f,  // bottom right
-        -1.0f, -1.0f, 0.0f,  // bottom left
-        -1.0f,  1.0f, 0.0f   // top left
-    };
-    unsigned int indices[] = {  // note that we start from 0!
-        0, 1, 3,   // first triangle
-        1, 2, 3    // second triangle
-    };
-
-    // Bind vertex array object
-    glBindVertexArray(vao);
-    // Copy vertices array into vertex buffer
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-    // Copy indices into element buffer
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-    // Set the vertex attributes
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
-    // Unbind our friends
-    glBindVertexArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
     // Setup shaders
     program_ = std::make_unique<ShaderProgram>();
@@ -104,6 +87,60 @@ std::optional<std::string> App::setup(
         return err;
     }
 
+    // Bind vertex array object
+    glGenVertexArrays(1, &vao);
+    glBindVertexArray(vao);
+
+    // Copy indices into element buffer
+    glGenBuffers(1, &ebo);
+    unsigned int indices[] = {
+        0, 1, 3,   // first triangle
+        1, 2, 3    // second triangle
+    };
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+    // Copy position vetex attributes
+    GLfloat pos[] = {
+        1.0f,  1.0f, 0.0f,
+        1.0f, -1.0f, 0.0f,
+        -1.0f, -1.0f, 0.0f,
+        -1.0f,  1.0f, 0.0f,
+    };
+    glGenBuffers(1, &pos_vbo_);
+    glBindBuffer(GL_ARRAY_BUFFER, pos_vbo_);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(pos), pos, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+    glEnableVertexAttribArray(0);
+
+    // Copy texture coord vertex attributes
+    GLfloat coords[] = {
+        1.0f, 1.0f,
+        1.0f, 0.0f,
+        0.0f, 0.0f,
+        0.0f, 1.0f,
+    };
+    glGenBuffers(1, &coord_vbo_);
+    glBindBuffer(GL_ARRAY_BUFFER, coord_vbo_);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(coords), coords, GL_STATIC_DRAW);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, NULL);
+    glEnableVertexAttribArray(1);
+
+    // Unbind our friends
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    // Texture creation
+    glGenTextures(1, &webcam_tex_);
+    glBindTexture(GL_TEXTURE_2D, webcam_tex_);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    // This comment is a reminder of what we didn't unbind
+    // glBindVertexArray(0);
+
     return {};
 }
 
@@ -116,17 +153,38 @@ void App::draw(GLFWwindow* window, double t) {
     std::string err = program_->update().value_or("");
     if (err != "") {
         if (err != last_err_) {
-            std::cout << err << std::endl;
+            std::cerr << err << std::endl;
             last_err_ = err;
         }
     } else if (last_err_ != "") {
-        std::cout << "- No More Errors! - " << std::endl;
+        std::cerr << "- No More Errors! - " << std::endl;
         last_err_ = "";
     }
 
-    GLuint program = program_->getProgram();
     // Use our shader
+    GLuint program = program_->getProgram();
     glUseProgram(program);
+
+    // Read webcam
+    std::optional<GLint> webcam_loc = program_->getUniformLoc("cap0");
+    if ((program_->getUniformLoc("iResolutionCap0") || webcam_loc) && setupWebcam(0)) {
+        cv::Mat frame;
+        if (webcam_->read(frame) && webcam_loc) {
+            cv::cvtColor(frame, frame, cv::COLOR_BGR2RGB);
+            flip(frame, frame, -1);
+
+            cv::Size size = frame.size();
+
+            glBindTexture(GL_TEXTURE_2D, webcam_tex_);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, size.width, size.height, 0, GL_RGB, GL_UNSIGNED_BYTE, frame.data);
+            glUniform1i(webcam_loc.value(), 0);
+        }
+
+        program_->markUniformInUse("cap0");
+        program_->setUniform("iResolutionCap0", [this, program](GLint& id) {
+            glProgramUniform2f(program, id, (GLfloat) webcam_->getWidth(), (GLfloat) webcam_->getHeight());
+        });
+    }
 
     // Set uniforms
     int width, height;
@@ -173,9 +231,7 @@ void App::draw(GLFWwindow* window, double t) {
     }
 
     // Draw our vertices
-    glBindVertexArray(vao);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-    glBindVertexArray(0);
 
     glUseProgram(0);
 
@@ -183,15 +239,14 @@ void App::draw(GLFWwindow* window, double t) {
     for (const auto& unset : program_->getUnsetUniforms()) {
         warning += "WARNING: unset in-use uniform '" + unset + "'\n";
     }
-
     if (warning != "") {
         if (warning != last_warning_) {
             // There's a newline at the end of warning
-            std::cout << warning << std::flush;
+            std::cerr << warning << std::flush;
             last_warning_ = warning;
         }
     } else if (last_warning_ != "") {
-        std::cout << "- No More Warnings! - " << std::endl;
+        std::cerr << "- No More Warnings! - " << std::endl;
         last_warning_ = "";
     }
 }

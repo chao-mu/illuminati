@@ -30,6 +30,7 @@ class ShaderProgram {
 
         std::optional<GLint> getUniformLoc(std::string name);
         void setUniform(const std::string& name, std::function<void(GLint&)> f);
+        void markUniformInUse(const std::string& name);
         std::vector<std::string> getUnsetUniforms();
 
     private:
@@ -37,8 +38,7 @@ class ShaderProgram {
         std::map<std::string, GLint> uniforms_;
         std::vector<GLint> set_uniforms_;
         bool should_switch_ = false;
-        ProgramHandle internal_program_;
-        ProgramHandle external_program_;
+        ProgramHandle program_;
 };
 
 #endif

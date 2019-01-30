@@ -93,33 +93,38 @@ int main(int argc, char** argv) {
 
 #ifdef BENCHMARK
     double frames = 0;
-    float last_benchmark = 0;
-#else
-    double last_frame = -1;
-    double per_frame = 1 / 30.;
-#endif
+    double last_benchmark = 0;
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
         double t = glfwGetTime();
 
-#ifdef BENCHMARK
         frames++;
         app->draw(window, t);
         if (t - last_benchmark >= 1.0) {
-            printf("%f ms/frame\n", 1000.0/double(frames));
+            printf("%f ms/frame\n", 1000.0/frames);
             frames = 0;
             last_benchmark = t;
         }
+
+        glfwSwapBuffers(window);
+    }
 #else
+    double last_frame = -1;
+    double per_frame = 1 / 30.;
+    while (!glfwWindowShouldClose(window)) {
+        glfwPollEvents();
+
+        double t = glfwGetTime();
+
         if (last_frame < 0 || t - last_frame > per_frame) {
             app->draw(window, t);
             last_frame = t;
         }
-#endif
 
         glfwSwapBuffers(window);
     }
+#endif
 
     glfwDestroyWindow(window);
     glfwTerminate();

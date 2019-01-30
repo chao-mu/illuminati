@@ -6,11 +6,13 @@
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <opencv2/opencv.hpp>
 
 #include "Result.h"
 #include "ShaderProgram.h"
 #include "Joystick.h"
 #include "JoystickManager.h"
+#include "Webcam.h"
 
 class App {
     public:
@@ -22,11 +24,14 @@ class App {
         void onKey(GLFWwindow* window, int key, int scancode, int action, int mods);
         Error writeFBO(GLFWwindow* window, const std::filesystem::path& path);
         Error screenshot(GLFWwindow* window);
+        bool setupWebcam(int dev);
 
     private:
         GLuint ebo = 0;
         GLuint vao = 0;
-        GLuint vbo = 0;
+        GLuint pos_vbo_ = 0;
+        GLuint coord_vbo_ = 0;
+        GLuint webcam_tex_ = 0;
 
         std::unique_ptr<ShaderProgram> program_;
         std::unique_ptr<JoystickManager> joy_manager_;
@@ -34,6 +39,7 @@ class App {
         std::string last_err_ = "";
         std::string last_warning_ = "";
         const std::filesystem::path out_dir_;
+        std::unique_ptr<Webcam> webcam_;
 };
 
 #endif

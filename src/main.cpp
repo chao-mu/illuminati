@@ -9,7 +9,7 @@
 #include "App.h"
 #include "Joystick.h"
 
-// #define BENCHMARK
+#define BENCHMARK
 
 std::unique_ptr<App> app;
 
@@ -32,6 +32,9 @@ int main(int argc, char** argv) {
     TCLAP::ValueArg<std::string> frag_arg("", "frag", "path to fragment shader", false, "frag.glsl", "string", cmd);
     TCLAP::ValueArg<std::string> out_arg("", "out-dir", "path to output directory", false, ".", "string", cmd);
     TCLAP::MultiArg<std::string> joy_arg("j", "joystick", "path to joystick configuration", false, "string", cmd);
+    TCLAP::ValueArg<int> width_arg("", "width", "Resolution width", false, 1280, "int", cmd);
+    TCLAP::ValueArg<int> height_arg("", "height", "Resolution height", false, 720, "int", cmd);
+    TCLAP::ValueArg<std::string> img_arg("i", "img", "texture image path", false, "", "string", cmd);
 
     try {
         cmd.parse(argc, argv);
@@ -51,6 +54,14 @@ int main(int argc, char** argv) {
 
         joysticks.push_back(joy);
     }
+    std::filesystem::path img_path = "";
+    if (img_arg.isSet()) {
+        img_path = std::filesystem::absolute(img_arg.getValue());
+        if (!std::filesystem::exists(img_path) || std::filesystem::is_directory(img_path)) {
+            std::cerr << "error: specified image path does not exist or is a directory" << std::endl;
+            return 1;
+        }
+    }
 
     std::filesystem::path out_dir = std::filesystem::absolute(out_arg.getValue());
     if (!std::filesystem::is_directory(out_dir)) {
@@ -58,7 +69,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    app = std::make_unique<App>(out_dir);
+    app = std::make_unique<App>(out_dir, std::make_pair(width_arg.getValue(), height_arg.getValue()));
 
     glfwSetErrorCallback(onError);
     if (!glfwInit()) {
@@ -85,7 +96,7 @@ int main(int argc, char** argv) {
     std::filesystem::path frag_path = std::filesystem::absolute(frag_arg.getValue());
 
     // Setup our app
-    std::optional<std::string> err = app->setup(vert_path, frag_path, joysticks);
+    std::optional<std::string> err = app->setup(vert_path, frag_path, joysticks, img_path);
     if (err.has_value()) {
         std::cerr << "Error initializing app" << std::endl << err.value() << std::endl;
         return 1;

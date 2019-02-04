@@ -9,7 +9,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
 # My stuff
-add_executable(demo src/main.cpp src/App.cpp src/MathUtil.cpp src/JoystickManager.cpp src/Joystick.cpp src/Result.cpp src/ShaderProgram.cpp src/Webcam.cpp)
+add_executable(demo src/main.cpp src/App.cpp src/MathUtil.cpp src/JoystickManager.cpp src/Joystick.cpp src/Result.cpp src/ShaderProgram.cpp src/Webcam.cpp src/Image.cpp)
 target_include_directories(demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} "${CMAKE_SOURCE_DIR}/thirdparty/lodepng")
 target_compile_options(demo PRIVATE "-Wextra" "-Werror" "-Wall" "-pedantic-errors" "-Wconversion")
 target_link_libraries(demo stdc++fs)

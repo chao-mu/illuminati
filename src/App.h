@@ -13,11 +13,12 @@
 #include "Joystick.h"
 #include "JoystickManager.h"
 #include "Webcam.h"
+#include "Image.h"
 
 class App {
     public:
-        App(const std::filesystem::path& out_dir);
-        Error setup(std::filesystem::path vert_path, std::filesystem::path frag_path, std::vector<std::shared_ptr<Joystick>> joysticks);
+        App(const std::filesystem::path& out_dir, std::pair<int, int> size);
+        Error setup(std::filesystem::path vert_path, std::filesystem::path frag_path, std::vector<std::shared_ptr<Joystick>> joysticks, std::filesystem::path& path);
         void draw(GLFWwindow* window, double t);
         void onError(int error, const char* desc);
         void onWindowSize(GLFWwindow* window, int width, int height);
@@ -32,7 +33,9 @@ class App {
         GLuint pos_vbo_ = 0;
         GLuint coord_vbo_ = 0;
         GLuint webcam_tex_ = 0;
+        GLuint fbo_ = 0;
 
+        std::unique_ptr<Image> img_;
         std::unique_ptr<ShaderProgram> program_;
         std::unique_ptr<JoystickManager> joy_manager_;
         std::vector<std::shared_ptr<Joystick>> joysticks_;
@@ -40,6 +43,7 @@ class App {
         std::string last_warning_ = "";
         const std::filesystem::path out_dir_;
         std::unique_ptr<Webcam> webcam_;
+        std::pair<int, int> size_;
 };
 
 #endif

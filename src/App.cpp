@@ -12,7 +12,11 @@
 
 #include "Result.h"
 
-App::App(const std::filesystem::path& out_dir) : out_dir_(out_dir) {}
+#define IMG_UNIT GL_TEXTURE0
+#define WEBCAM_UNIT GL_TEXTURE1
+
+App::App(const std::filesystem::path& out_dir, std::pair<int, int> size)
+    : img_(new Image()), out_dir_(out_dir), size_(size)  {}
 
 // Write the current frame buffer as a png file at specified path.
 Error App::writeFBO(GLFWwindow* window, const std::filesystem::path& path) {
@@ -66,7 +70,8 @@ bool App::setupWebcam(int dev) {
 std::optional<std::string> App::setup(
         std::filesystem::path vert_path,
         std::filesystem::path frag_path,
-        std::vector<std::shared_ptr<Joystick>> joysticks
+        std::vector<std::shared_ptr<Joystick>> joysticks,
+        std::filesystem::path& img_path
         ) {
     joy_manager_ = std::make_unique<JoystickManager>();
     joysticks_ = joysticks;
@@ -85,6 +90,13 @@ std::optional<std::string> App::setup(
     err = program_->loadShader(GL_FRAGMENT_SHADER, frag_path);
     if (err.has_value()) {
         return err;
+    }
+
+    if (img_path != "") {
+        Error err = img_->setup(img_path, IMG_UNIT);
+        if (err) {
+            return err;
+        }
     }
 
     // Bind vertex array object
@@ -165,6 +177,19 @@ void App::draw(GLFWwindow* window, double t) {
     GLuint program = program_->getProgram();
     glUseProgram(program);
 
+    if (img_->isInitialized()) {
+        program_->setUniform("img0", [this, program](GLint& id) {
+            // not needed?
+            glActiveTexture(img_->getTextureUnit());
+            glBindTexture(GL_TEXTURE_2D, img_->getID());
+            glUniform1i(id, img_->getTextureUnit());
+        });
+
+        program_->setUniform("iResolutionImg0", [this, program](GLint& id) {
+            glProgramUniform2f(program, id, (float)img_->getWidth(), (float)img_->getHeight());
+        });
+    }
+
     // Read webcam
     std::optional<GLint> webcam_loc = program_->getUniformLoc("cap0");
     if ((program_->getUniformLoc("iResolutionCap0") || webcam_loc) && setupWebcam(0)) {
@@ -177,7 +202,7 @@ void App::draw(GLFWwindow* window, double t) {
 
             glBindTexture(GL_TEXTURE_2D, webcam_tex_);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, size.width, size.height, 0, GL_RGB, GL_UNSIGNED_BYTE, frame.data);
-            glUniform1i(webcam_loc.value(), 0);
+            glUniform1i(webcam_loc.value(), WEBCAM_UNIT);
         }
 
         program_->markUniformInUse("cap0");
@@ -272,3 +297,6 @@ void App::onWindowSize(GLFWwindow* /*window*/, int width, int height) {
 void App::onError(int /* error */, const char* desc) {
     fputs(desc, stderr);
 }
+
+#undef WEBCAM_UNIT
+#undef IMG_UNIT

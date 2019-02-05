@@ -23,8 +23,7 @@ class App {
         void onError(int error, const char* desc);
         void onWindowSize(GLFWwindow* window, int width, int height);
         void onKey(GLFWwindow* window, int key, int scancode, int action, int mods);
-        Error writeFBO(GLFWwindow* window, const std::filesystem::path& path);
-        Error screenshot(GLFWwindow* window);
+        Error screenshot();
         bool setupWebcam(int dev);
 
     private:

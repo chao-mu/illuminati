@@ -9,6 +9,12 @@ Error Image::setup(std::filesystem::path& path, GLenum texture_unit) {
         return "PNG decoder error " + std::to_string(errc) + ": "+ lodepng_error_text(errc);
     }
 
+    std::vector<unsigned char> flipped;
+    for (int row = height_ - 1; row >= 0; row--) {
+        int offset = row * (width_ * 4);
+        flipped.insert(flipped.end(), image.begin() + offset, image.begin() + offset + (width_ * 4));
+    }
+
     if (tex_id_ == GL_FALSE) {
         glGenTextures(1, &tex_id_);
     }
@@ -25,7 +31,7 @@ Error Image::setup(std::filesystem::path& path, GLenum texture_unit) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width_, height_, 0, GL_RGBA, GL_UNSIGNED_BYTE, &image[0]);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width_, height_, 0, GL_RGBA, GL_UNSIGNED_BYTE, &flipped[0]);
     glBindTexture(GL_TEXTURE_2D, 0);
 
     glActiveTexture(prev_active);

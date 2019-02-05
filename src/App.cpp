@@ -20,25 +20,8 @@
 App::App(const std::filesystem::path& out_dir, std::pair<int, int> size)
     : img_(new Image()), out_dir_(out_dir), size_(size)  {}
 
-// Write the current frame buffer as a png file at specified path.
-Error App::writeFBO(GLFWwindow* window, const std::filesystem::path& path) {
-    int width, height;
-    glfwGetWindowSize(window, &width, &height);
 
-    std::vector<unsigned char> image(width * height * 4);
-    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, &image[0]);
-
-    unsigned errc = lodepng::encode(path, image, width, height);
-    if (errc) {
-        std::stringstream ss;
-        ss << "encoder error " << errc << ": "<< lodepng_error_text(errc);
-        return ss.str();
-    }
-
-    return {};
-}
-
-Error App::screenshot(GLFWwindow* window) {
+Error App::screenshot() {
     std::stringstream s;
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::system_clock::now().time_since_epoch()
@@ -47,9 +30,26 @@ Error App::screenshot(GLFWwindow* window) {
     s << "output-" << std::put_time(std::localtime(&now), "%Y-%m-%d_") << ms << ".png";
     std::filesystem::path dest = out_dir_ / s.str();
 
-    Error err = App::writeFBO(window, dest);
-    if (err) {
-        return err;
+    int width = size_.first;
+    int height = size_.second;
+
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo_);
+    GLsizei pixels = width * height;
+    std::vector<unsigned char> image(pixels * 4);
+    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, &image[0]);
+
+    // Flip upside down (PNG's coordinate system is upside down to OpenGL's)
+    std::vector<unsigned char> flipped;
+    for (int row = height - 1; row >= 0; row--) {
+        int offset = row * (width * 4);
+        flipped.insert(flipped.end(), image.begin() + offset, image.begin() + offset + (width * 4));
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    unsigned errc = lodepng::encode(dest, flipped, width, height);
+    if (errc) {
+        return "encoder error " + std::to_string(errc) + ": "+ lodepng_error_text(errc);
     }
 
     return {};
@@ -163,6 +163,7 @@ std::optional<std::string> App::setup(
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size_.first, size_.second, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glBindTexture(GL_TEXTURE_2D, 0);
     }
 
     glFramebufferTexture(GL_FRAMEBUFFER, draw_bufs_[0], output_texs_[0], 0);
@@ -282,6 +283,11 @@ void App::draw(GLFWwindow* window, double t) {
     glUseProgram(0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+    // Swap the ping pong buffer!
+    std::swap(draw_bufs_[0], draw_bufs_[1]);
+    std::swap(output_texs_[0], output_texs_[1]);
+
+    // Calculate blit settings
     DrawInfo draw_info = DrawInfo::scaleCenter(
             static_cast<float>(size_.first),
             static_cast<float>(size_.second),
@@ -293,7 +299,7 @@ void App::draw(GLFWwindow* window, double t) {
     glDrawBuffer(GL_BACK);
     glBindFramebuffer (GL_READ_FRAMEBUFFER, fbo_);
     // Calculate sizing for when we draw to the screen
-    glReadBuffer(draw_bufs_[0]);
+    glReadBuffer(draw_bufs_[1]);
     glViewport(0,0, win_width, win_height);
     glBlitFramebuffer(
         0,0, size_.first, size_.second,
@@ -301,10 +307,6 @@ void App::draw(GLFWwindow* window, double t) {
         GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT,
         GL_NEAREST
     );
-
-    // Swap the ping pong buffer!
-    std::swap(draw_bufs_[0], draw_bufs_[1]);
-    std::swap(output_texs_[0], output_texs_[1]);
 
     std::string warning;
     for (const auto& unset : program_->getUnsetUniforms()) {
@@ -329,8 +331,8 @@ void App::onKey(GLFWwindow* window, int key, int /*scancode*/, int action, int /
                 glfwSetWindowShouldClose(window, GLFW_TRUE);
                 break;
             case GLFW_KEY_P:
-                auto err = screenshot(window);
-                if (err) std::cerr << "Error screenshotting: " << err.value();
+                auto err = screenshot();
+                if (err) std::cerr << "Error screenshotting: " << err.value() << std::endl;
                 break;
         }
     }

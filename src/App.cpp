@@ -11,9 +11,11 @@
 #include "lodepng.h"
 
 #include "Result.h"
+#include "MathUtil.h"
 
 #define IMG_UNIT GL_TEXTURE0
 #define WEBCAM_UNIT GL_TEXTURE1
+#define LAST_OUTPUT_UNIT GL_TEXTURE2
 
 App::App(const std::filesystem::path& out_dir, std::pair<int, int> size)
     : img_(new Image()), out_dir_(out_dir), size_(size)  {}
@@ -150,6 +152,23 @@ std::optional<std::string> App::setup(
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBindTexture(GL_TEXTURE_2D, 0);
 
+    glGenFramebuffers(1, &fbo_);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo_);
+
+    glGenTextures(2, output_texs_);
+    for (const auto& id : output_texs_) {
+        glBindTexture(GL_TEXTURE_2D, id);
+
+        // Give an empty image to OpenGL ( the last "0" )
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size_.first, size_.second, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    }
+
+    glFramebufferTexture(GL_FRAMEBUFFER, draw_bufs_[0], output_texs_[0], 0);
+    glFramebufferTexture(GL_FRAMEBUFFER, draw_bufs_[1], output_texs_[1], 0);
+
+
     // This comment is a reminder of what we didn't unbind
     // glBindVertexArray(0);
 
@@ -157,6 +176,9 @@ std::optional<std::string> App::setup(
 }
 
 void App::draw(GLFWwindow* window, double t) {
+    int win_width, win_height;
+    glfwGetWindowSize(window, &win_width, &win_height);
+
     joy_manager_->update();
     for (auto& joy : joysticks_) {
         joy->update(t);
@@ -173,13 +195,14 @@ void App::draw(GLFWwindow* window, double t) {
         last_err_ = "";
     }
 
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo_);
+
     // Use our shader
     GLuint program = program_->getProgram();
     glUseProgram(program);
 
     if (img_->isInitialized()) {
         program_->setUniform("img0", [this, program](GLint& id) {
-            // not needed?
             glActiveTexture(img_->getTextureUnit());
             glBindTexture(GL_TEXTURE_2D, img_->getID());
             glUniform1i(id, img_->getTextureUnit());
@@ -211,12 +234,8 @@ void App::draw(GLFWwindow* window, double t) {
         });
     }
 
-    // Set uniforms
-    int width, height;
-    glfwGetWindowSize(window, &width, &height);
-
-    program_->setUniform("iResolution", [width, height, program](GLint& id) {
-        glProgramUniform2f(program, id, (float)width, (float)height);
+    program_->setUniform("iResolution", [this, program](GLint& id) {
+        glProgramUniform2f(program, id, (float)size_.first, (float)size_.second);
     });
 
     program_->setUniform("iTime", [t, program](GLint& id) {
@@ -255,10 +274,37 @@ void App::draw(GLFWwindow* window, double t) {
         i++;
     }
 
+    glViewport(0,0, size_.first, size_.second);
+    glDrawBuffers(1, &draw_bufs_[0]);
+
     // Draw our vertices
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
     glUseProgram(0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    DrawInfo draw_info = DrawInfo::scaleCenter(
+            static_cast<float>(size_.first),
+            static_cast<float>(size_.second),
+            static_cast<float>(win_width),
+            static_cast<float>(win_height));
+
+    // Draw to the screen
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    glDrawBuffer(GL_BACK);
+    glBindFramebuffer (GL_READ_FRAMEBUFFER, fbo_);
+    // Calculate sizing for when we draw to the screen
+    glReadBuffer(draw_bufs_[0]);
+    glViewport(0,0, win_width, win_height);
+    glBlitFramebuffer(
+        0,0, size_.first, size_.second,
+        draw_info.x0, draw_info.y0, draw_info.x1, draw_info.y1,
+        GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT,
+        GL_NEAREST
+    );
+
+    // Swap the ping pong buffer!
+    std::swap(draw_bufs_[0], draw_bufs_[1]);
+    std::swap(output_texs_[0], output_texs_[1]);
 
     std::string warning;
     for (const auto& unset : program_->getUnsetUniforms()) {

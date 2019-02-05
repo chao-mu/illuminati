@@ -28,12 +28,15 @@ class App {
         bool setupWebcam(int dev);
 
     private:
-        GLuint ebo = 0;
-        GLuint vao = 0;
-        GLuint pos_vbo_ = 0;
-        GLuint coord_vbo_ = 0;
-        GLuint webcam_tex_ = 0;
-        GLuint fbo_ = 0;
+        GLuint ebo = GL_FALSE;
+        GLuint vao = GL_FALSE;
+        GLuint pos_vbo_ = GL_FALSE;
+        GLuint coord_vbo_ = GL_FALSE;
+        GLuint webcam_tex_ = GL_FALSE;
+        GLuint fbo_ = GL_FALSE;
+
+        GLuint output_texs_[2] = {};
+        GLenum draw_bufs_[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
 
         std::unique_ptr<Image> img_;
         std::unique_ptr<ShaderProgram> program_;
@@ -44,6 +47,7 @@ class App {
         const std::filesystem::path out_dir_;
         std::unique_ptr<Webcam> webcam_;
         std::pair<int, int> size_;
+
 };
 
 #endif

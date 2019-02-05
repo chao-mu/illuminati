@@ -29,6 +29,7 @@ Error Image::setup(std::filesystem::path& path, GLenum texture_unit) {
     glBindTexture(GL_TEXTURE_2D, 0);
 
     glActiveTexture(prev_active);
+
     initialized_ = true;
 
     return {};

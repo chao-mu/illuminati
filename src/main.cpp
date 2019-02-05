@@ -25,6 +25,23 @@ static void onKey(GLFWwindow* window, int key, int scancode, int action, int mod
     app->onKey(window, key, scancode, action, mods);
 }
 
+std::optional<std::pair<int, int>> parseRes(const std::string& s) {
+    size_t x = s.find("x");
+    if (x == std::string::npos) {
+        return {};
+    }
+
+    int w, h;
+    try {
+       w = std::stoi(s.substr(0, x));
+       h = std::stoi(s.substr(x + 1));
+    } catch (std::invalid_argument& e) {
+        return {};
+    }
+
+    return std::make_pair(w, h);
+}
+
 int main(int argc, char** argv) {
     TCLAP::CmdLine cmd("Illuminati - Everything is Light");
 
@@ -32,14 +49,32 @@ int main(int argc, char** argv) {
     TCLAP::ValueArg<std::string> frag_arg("", "frag", "path to fragment shader", false, "frag.glsl", "string", cmd);
     TCLAP::ValueArg<std::string> out_arg("", "out-dir", "path to output directory", false, ".", "string", cmd);
     TCLAP::MultiArg<std::string> joy_arg("j", "joystick", "path to joystick configuration", false, "string", cmd);
-    TCLAP::ValueArg<int> width_arg("", "width", "Resolution width", false, 1280, "int", cmd);
-    TCLAP::ValueArg<int> height_arg("", "height", "Resolution height", false, 720, "int", cmd);
+    TCLAP::ValueArg<std::string> res_arg("r", "resolution", "Resolution in the format axb where 'a' is with and 'b' is height", false, "1280x720", "string", cmd);
+    TCLAP::ValueArg<std::string> window_arg("w", "window", "Window size in the format axb where 'a' is with and 'b' is height", false, "1280x720", "string", cmd);
     TCLAP::ValueArg<std::string> img_arg("i", "img", "texture image path", false, "", "string", cmd);
 
     try {
         cmd.parse(argc, argv);
     } catch (TCLAP::ArgException &e) {
         std::cerr << "error: " << e.error() << " for arg " << e.argId() << std::endl;
+        return 1;
+    }
+
+    std::optional<std::pair<int, int>> res_opt = parseRes(res_arg.getValue());
+    std::pair<int, int> res;
+    if (res_opt) {
+        res = res_opt.value();
+    } else {
+        std::cerr << "error parsing resolution argument, was expecting format axb e.g. 1080x720" << std::endl;
+        return 1;
+    }
+
+    std::optional<std::pair<int, int>> window_res_opt = parseRes(window_arg.getValue());
+    std::pair<int, int> window_res;
+    if (window_res_opt) {
+        window_res = window_res_opt.value();
+    } else {
+        std::cerr << "error parsing screen resolution argument, was expecting format axb e.g. 1080x720" << std::endl;
         return 1;
     }
 
@@ -69,7 +104,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    app = std::make_unique<App>(out_dir, std::make_pair(width_arg.getValue(), height_arg.getValue()));
+    app = std::make_unique<App>(out_dir, std::make_pair(res.first, res.second));
 
     glfwSetErrorCallback(onError);
     if (!glfwInit()) {
@@ -77,7 +112,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    GLFWwindow* window = glfwCreateWindow(640, 480, "Awesome Demo", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(window_res.first, window_res.second, "Awesome Demo", NULL, NULL);
     if (!window) {
         glfwTerminate();
         fprintf(stderr, "Failed to create window\n");

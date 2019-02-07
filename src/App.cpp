@@ -25,8 +25,8 @@
 #define SRC 0
 #define DEST 1
 
-App::App(const std::filesystem::path& out_dir, std::pair<int, int> size)
-    : img_(new Image()), out_dir_(out_dir), size_(size)  {}
+App::App(const std::filesystem::path& out_dir, std::pair<int, int> size, int repeat)
+    : img_(new Image()), out_dir_(out_dir), size_(size), repeat_(repeat)  {}
 
 
 Error App::screenshot() {
@@ -203,107 +203,113 @@ void App::draw(GLFWwindow* window, double t) {
         last_err_ = "";
     }
 
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo_);
-    glDrawBuffer(draw_bufs_[DEST]);
+    for (int i = 0; i < repeat_; i++) {
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo_);
+        glDrawBuffer(draw_bufs_[DEST]);
 
-    // Use our shader
-    GLuint program = program_->getProgram();
-    glUseProgram(program);
+        // Use our shader
+        GLuint program = program_->getProgram();
+        glUseProgram(program);
 
-    if (img_->isInitialized()) {
-        program_->setUniform("img0", [this, program](GLint& id) {
-            glActiveTexture(IMG_UNIT_GL);
-            glBindTexture(GL_TEXTURE_2D, img_->getID());
-            glUniform1i(id, 0);
+        program_->setUniform("iteration", [this, program, i](GLint& id) {
+            glProgramUniform1i(program, id, i);
         });
 
-        program_->setUniform("iResolutionImg0", [this, program](GLint& id) {
-            glProgramUniform2f(program, id, (float)img_->getWidth(), (float)img_->getHeight());
-        });
-    }
-
-    // Read webcam
-    std::optional<GLint> webcam_loc = program_->getUniformLoc("cap0");
-    if ((program_->getUniformLoc("iResolutionCap0") || webcam_loc) && setupWebcam(0)) {
-        cv::Mat frame;
-        if (webcam_->read(frame) && webcam_loc) {
-            cv::cvtColor(frame, frame, cv::COLOR_BGR2RGB);
-            flip(frame, frame, -1);
-
-            cv::Size size = frame.size();
-
-            glActiveTexture(WEBCAM_UNIT_GL);
-            glBindTexture(GL_TEXTURE_2D, webcam_tex_);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, size.width, size.height, 0, GL_RGB, GL_UNSIGNED_BYTE, frame.data);
-            glUniform1i(webcam_loc.value(), WEBCAM_UNIT);
-        }
-
-        program_->markUniformInUse("cap0");
-        program_->setUniform("iResolutionCap0", [this, program](GLint& id) {
-            glProgramUniform2f(program, id, (GLfloat) webcam_->getWidth(), (GLfloat) webcam_->getHeight());
-        });
-    }
-
-    program_->setUniform("iResolution", [this, program](GLint& id) {
-        glProgramUniform2f(program, id, (float)size_.first, (float)size_.second);
-    });
-
-    program_->setUniform("iTime", [t, program](GLint& id) {
-        glProgramUniform1f(program, id, (float)t);
-    });
-
-    program_->setUniform("lastOut", [this, program](GLint& id) {
-        glActiveTexture(LAST_OUTPUT_UNIT_GL);
-        glBindTexture(GL_TEXTURE_2D, output_texs_[SRC]);
-        glUniform1i(id, LAST_OUTPUT_UNIT);
-    });
-
-    program_->setUniform("firstPass", [this, program](GLint& id) {
-        glProgramUniform1i(program, id, first_pass_);
-    });
-
-    int i = 1;
-    for (const auto& joy : joysticks_) {
-        auto outs = joy->getOutputs();
-        for (const auto& kv : outs) {
-            const std::string& name = kv.first;
-            const JoystickOutput& ctrl = kv.second;
-            const std::string base = "j" + std::to_string(i) + name;
-
-            program_->setUniform(base + "Pressed", [ctrl, program](GLint& id) {
-                glProgramUniform1i(program, id, ctrl.pressed ? 1 : 0);
+        if (img_->isInitialized()) {
+            program_->setUniform("img0", [this, program](GLint& id) {
+                glActiveTexture(IMG_UNIT_GL);
+                glBindTexture(GL_TEXTURE_2D, img_->getID());
+                glUniform1i(id, 0);
             });
 
-            program_->setUniform(base + "PressedNew", [ctrl, program](GLint& id) {
-                glProgramUniform1i(program, id, ctrl.pressed_new ? 1 : 0);
-            });
-
-            program_->setUniform(base + "Time", [ctrl, program](GLint& id) {
-                glProgramUniform1f(program, id, (float)ctrl.time);
-            });
-
-            program_->setUniform(base + "TimeTotal", [ctrl, program](GLint& id) {
-                glProgramUniform1f(program, id, (float)ctrl.time_total);
-            });
-
-            program_->setUniform(base, [ctrl, program](GLint& id) {
-                glProgramUniform1f(program, id, ctrl.value);
+            program_->setUniform("iResolutionImg0", [this, program](GLint& id) {
+                glProgramUniform2f(program, id, (float)img_->getWidth(), (float)img_->getHeight());
             });
         }
 
-        i++;
+        // Read webcam
+        std::optional<GLint> webcam_loc = program_->getUniformLoc("cap0");
+        if ((program_->getUniformLoc("iResolutionCap0") || webcam_loc) && setupWebcam(0)) {
+            cv::Mat frame;
+            if (webcam_->read(frame) && webcam_loc) {
+                cv::cvtColor(frame, frame, cv::COLOR_BGR2RGB);
+                flip(frame, frame, -1);
+
+                cv::Size size = frame.size();
+
+                glActiveTexture(WEBCAM_UNIT_GL);
+                glBindTexture(GL_TEXTURE_2D, webcam_tex_);
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, size.width, size.height, 0, GL_RGB, GL_UNSIGNED_BYTE, frame.data);
+                glUniform1i(webcam_loc.value(), WEBCAM_UNIT);
+            }
+
+            program_->markUniformInUse("cap0");
+            program_->setUniform("iResolutionCap0", [this, program](GLint& id) {
+                glProgramUniform2f(program, id, (GLfloat) webcam_->getWidth(), (GLfloat) webcam_->getHeight());
+            });
+        }
+
+        program_->setUniform("iResolution", [this, program](GLint& id) {
+            glProgramUniform2f(program, id, (float)size_.first, (float)size_.second);
+        });
+
+        program_->setUniform("iTime", [t, program](GLint& id) {
+            glProgramUniform1f(program, id, (float)t);
+        });
+
+        program_->setUniform("lastOut", [this, program](GLint& id) {
+            glActiveTexture(LAST_OUTPUT_UNIT_GL);
+            glBindTexture(GL_TEXTURE_2D, output_texs_[SRC]);
+            glUniform1i(id, LAST_OUTPUT_UNIT);
+        });
+
+        program_->setUniform("firstPass", [this, program](GLint& id) {
+            glProgramUniform1i(program, id, first_pass_);
+        });
+
+        int joy_idx = 1;
+        for (const auto& joy : joysticks_) {
+            auto outs = joy->getOutputs();
+            for (const auto& kv : outs) {
+                const std::string& name = kv.first;
+                const JoystickOutput& ctrl = kv.second;
+                const std::string base = "j" + std::to_string(joy_idx) + name;
+
+                program_->setUniform(base + "Pressed", [ctrl, program](GLint& id) {
+                    glProgramUniform1i(program, id, ctrl.pressed ? 1 : 0);
+                });
+
+                program_->setUniform(base + "PressedNew", [ctrl, program](GLint& id) {
+                    glProgramUniform1i(program, id, ctrl.pressed_new ? 1 : 0);
+                });
+
+                program_->setUniform(base + "Time", [ctrl, program](GLint& id) {
+                    glProgramUniform1f(program, id, (float)ctrl.time);
+                });
+
+                program_->setUniform(base + "TimeTotal", [ctrl, program](GLint& id) {
+                    glProgramUniform1f(program, id, (float)ctrl.time_total);
+                });
+
+                program_->setUniform(base, [ctrl, program](GLint& id) {
+                    glProgramUniform1f(program, id, ctrl.value);
+                });
+            }
+
+            joy_idx++;
+        }
+
+        glViewport(0,0, size_.first, size_.second);
+
+        // Draw our vertices
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        glUseProgram(0);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        // Swap the ping pong buffer!
+        std::swap(draw_bufs_[SRC], draw_bufs_[DEST]);
+        std::swap(output_texs_[SRC], output_texs_[DEST]);
     }
-
-    glViewport(0,0, size_.first, size_.second);
-
-    // Draw our vertices
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-    glUseProgram(0);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    // Swap the ping pong buffer!
-    std::swap(draw_bufs_[SRC], draw_bufs_[DEST]);
-    std::swap(output_texs_[SRC], output_texs_[DEST]);
 
     // Calculate blit settings
     DrawInfo draw_info = DrawInfo::scaleCenter(

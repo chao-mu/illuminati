@@ -17,7 +17,7 @@
 
 class App {
     public:
-        App(const std::filesystem::path& out_dir, std::pair<int, int> size);
+        App(const std::filesystem::path& out_dir, std::pair<int, int> size, int repeat);
         Error setup(std::filesystem::path vert_path, std::filesystem::path frag_path, std::vector<std::shared_ptr<Joystick>> joysticks, std::filesystem::path& path);
         void draw(GLFWwindow* window, double t);
         void onError(int error, const char* desc);
@@ -48,6 +48,7 @@ class App {
         std::unique_ptr<Webcam> webcam_;
         std::pair<int, int> size_;
         bool first_pass_ = true;
+        int repeat_;
 };
 
 #endif

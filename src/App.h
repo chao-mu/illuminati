@@ -35,7 +35,8 @@ class App {
         GLuint fbo_ = GL_FALSE;
 
         GLuint output_texs_[2] = {};
-        GLenum draw_bufs_[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+        GLuint draw_bufs_[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+        int currentActiveBuffer = 0;
 
         std::unique_ptr<Image> img_;
         std::unique_ptr<ShaderProgram> program_;
@@ -46,7 +47,7 @@ class App {
         const std::filesystem::path out_dir_;
         std::unique_ptr<Webcam> webcam_;
         std::pair<int, int> size_;
-
+        bool first_pass_ = true;
 };
 
 #endif

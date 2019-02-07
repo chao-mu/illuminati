@@ -13,9 +13,17 @@
 #include "Result.h"
 #include "MathUtil.h"
 
-#define IMG_UNIT GL_TEXTURE0
-#define WEBCAM_UNIT GL_TEXTURE1
-#define LAST_OUTPUT_UNIT GL_TEXTURE2
+#define IMG_UNIT 0
+#define IMG_UNIT_GL GL_TEXTURE0
+
+#define WEBCAM_UNIT 1
+#define WEBCAM_UNIT_GL GL_TEXTURE1
+
+#define LAST_OUTPUT_UNIT 2
+#define LAST_OUTPUT_UNIT_GL GL_TEXTURE2
+
+#define SRC 0
+#define DEST 1
 
 App::App(const std::filesystem::path& out_dir, std::pair<int, int> size)
     : img_(new Image()), out_dir_(out_dir), size_(size)  {}
@@ -166,9 +174,8 @@ std::optional<std::string> App::setup(
         glBindTexture(GL_TEXTURE_2D, 0);
     }
 
-    glFramebufferTexture(GL_FRAMEBUFFER, draw_bufs_[0], output_texs_[0], 0);
-    glFramebufferTexture(GL_FRAMEBUFFER, draw_bufs_[1], output_texs_[1], 0);
-
+    glFramebufferTexture(GL_FRAMEBUFFER, draw_bufs_[SRC], output_texs_[SRC], 0);
+    glFramebufferTexture(GL_FRAMEBUFFER, draw_bufs_[DEST], output_texs_[DEST], 0);
 
     // This comment is a reminder of what we didn't unbind
     // glBindVertexArray(0);
@@ -197,6 +204,7 @@ void App::draw(GLFWwindow* window, double t) {
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, fbo_);
+    glDrawBuffer(draw_bufs_[DEST]);
 
     // Use our shader
     GLuint program = program_->getProgram();
@@ -204,9 +212,9 @@ void App::draw(GLFWwindow* window, double t) {
 
     if (img_->isInitialized()) {
         program_->setUniform("img0", [this, program](GLint& id) {
-            glActiveTexture(img_->getTextureUnit());
+            glActiveTexture(IMG_UNIT_GL);
             glBindTexture(GL_TEXTURE_2D, img_->getID());
-            glUniform1i(id, img_->getTextureUnit());
+            glUniform1i(id, 0);
         });
 
         program_->setUniform("iResolutionImg0", [this, program](GLint& id) {
@@ -224,6 +232,7 @@ void App::draw(GLFWwindow* window, double t) {
 
             cv::Size size = frame.size();
 
+            glActiveTexture(WEBCAM_UNIT_GL);
             glBindTexture(GL_TEXTURE_2D, webcam_tex_);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, size.width, size.height, 0, GL_RGB, GL_UNSIGNED_BYTE, frame.data);
             glUniform1i(webcam_loc.value(), WEBCAM_UNIT);
@@ -241,6 +250,16 @@ void App::draw(GLFWwindow* window, double t) {
 
     program_->setUniform("iTime", [t, program](GLint& id) {
         glProgramUniform1f(program, id, (float)t);
+    });
+
+    program_->setUniform("lastOut", [this, program](GLint& id) {
+        glActiveTexture(LAST_OUTPUT_UNIT_GL);
+        glBindTexture(GL_TEXTURE_2D, output_texs_[SRC]);
+        glUniform1i(id, LAST_OUTPUT_UNIT);
+    });
+
+    program_->setUniform("firstPass", [this, program](GLint& id) {
+        glProgramUniform1i(program, id, first_pass_);
     });
 
     int i = 1;
@@ -276,7 +295,6 @@ void App::draw(GLFWwindow* window, double t) {
     }
 
     glViewport(0,0, size_.first, size_.second);
-    glDrawBuffers(1, &draw_bufs_[0]);
 
     // Draw our vertices
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
@@ -284,8 +302,8 @@ void App::draw(GLFWwindow* window, double t) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // Swap the ping pong buffer!
-    std::swap(draw_bufs_[0], draw_bufs_[1]);
-    std::swap(output_texs_[0], output_texs_[1]);
+    std::swap(draw_bufs_[SRC], draw_bufs_[DEST]);
+    std::swap(output_texs_[SRC], output_texs_[DEST]);
 
     // Calculate blit settings
     DrawInfo draw_info = DrawInfo::scaleCenter(
@@ -295,11 +313,9 @@ void App::draw(GLFWwindow* window, double t) {
             static_cast<float>(win_height));
 
     // Draw to the screen
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
     glDrawBuffer(GL_BACK);
-    glBindFramebuffer (GL_READ_FRAMEBUFFER, fbo_);
-    // Calculate sizing for when we draw to the screen
-    glReadBuffer(draw_bufs_[1]);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo_);
+    glReadBuffer(draw_bufs_[SRC]);
     glViewport(0,0, win_width, win_height);
     glBlitFramebuffer(
         0,0, size_.first, size_.second,
@@ -322,6 +338,8 @@ void App::draw(GLFWwindow* window, double t) {
         std::cerr << "- No More Warnings! - " << std::endl;
         last_warning_ = "";
     }
+
+    first_pass_ = false;
 }
 
 void App::onKey(GLFWwindow* window, int key, int /*scancode*/, int action, int /*mods*/) {
@@ -348,3 +366,6 @@ void App::onError(int /* error */, const char* desc) {
 
 #undef WEBCAM_UNIT
 #undef IMG_UNIT
+#undef LAST_OUTPUT_UNIT
+#undef SRC
+#undef DEST

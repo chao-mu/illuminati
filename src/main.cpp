@@ -9,7 +9,7 @@
 #include "App.h"
 #include "Joystick.h"
 
-#define BENCHMARK
+// #define BENCHMARK
 
 std::unique_ptr<App> app;
 

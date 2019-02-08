@@ -13,12 +13,20 @@
 #include "Result.h"
 #include "MathUtil.h"
 
-#define IMG_UNIT GL_TEXTURE0
-#define WEBCAM_UNIT GL_TEXTURE1
-#define LAST_OUTPUT_UNIT GL_TEXTURE2
+#define IMG_UNIT 0
+#define IMG_UNIT_GL GL_TEXTURE0
 
-App::App(const std::filesystem::path& out_dir, std::pair<int, int> size)
-    : img_(new Image()), out_dir_(out_dir), size_(size)  {}
+#define WEBCAM_UNIT 1
+#define WEBCAM_UNIT_GL GL_TEXTURE1
+
+#define LAST_OUTPUT_UNIT 2
+#define LAST_OUTPUT_UNIT_GL GL_TEXTURE2
+
+#define SRC 0
+#define DEST 1
+
+App::App(const std::filesystem::path& out_dir, std::pair<int, int> size, int repeat)
+    : img_(new Image()), out_dir_(out_dir), size_(size), repeat_(repeat)  {}
 
 
 Error App::screenshot() {
@@ -166,9 +174,8 @@ std::optional<std::string> App::setup(
         glBindTexture(GL_TEXTURE_2D, 0);
     }
 
-    glFramebufferTexture(GL_FRAMEBUFFER, draw_bufs_[0], output_texs_[0], 0);
-    glFramebufferTexture(GL_FRAMEBUFFER, draw_bufs_[1], output_texs_[1], 0);
-
+    glFramebufferTexture(GL_FRAMEBUFFER, draw_bufs_[SRC], output_texs_[SRC], 0);
+    glFramebufferTexture(GL_FRAMEBUFFER, draw_bufs_[DEST], output_texs_[DEST], 0);
 
     // This comment is a reminder of what we didn't unbind
     // glBindVertexArray(0);
@@ -196,96 +203,120 @@ void App::draw(GLFWwindow* window, double t) {
         last_err_ = "";
     }
 
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo_);
+    for (int i = 0; i < repeat_; i++) {
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo_);
+        glDrawBuffer(draw_bufs_[DEST]);
+  
+        // Use our shader
+        GLuint program = program_->getProgram();
+        glUseProgram(program);
 
-    // Use our shader
-    GLuint program = program_->getProgram();
-    glUseProgram(program);
-
-    if (img_->isInitialized()) {
-        program_->setUniform("img0", [this](GLint& id) {
-            glActiveTexture(img_->getTextureUnit());
-            glBindTexture(GL_TEXTURE_2D, img_->getID());
-            glUniform1i(id, img_->getTextureUnit());
-        });
-
-        program_->setUniform("iResolutionImg0", [this, program](GLint& id) {
-            glProgramUniform2f(program, id, (float)img_->getWidth(), (float)img_->getHeight());
-        });
-    }
-
-    // Read webcam
-    std::optional<GLint> webcam_loc = program_->getUniformLoc("cap0");
-    if ((program_->getUniformLoc("iResolutionCap0") || webcam_loc) && setupWebcam(0)) {
-        cv::Mat frame;
-        if (webcam_->read(frame) && webcam_loc) {
-            cv::cvtColor(frame, frame, cv::COLOR_BGR2RGB);
-            flip(frame, frame, -1);
-
-            cv::Size size = frame.size();
-
-            glBindTexture(GL_TEXTURE_2D, webcam_tex_);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, size.width, size.height, 0, GL_RGB, GL_UNSIGNED_BYTE, frame.data);
-            glUniform1i(webcam_loc.value(), WEBCAM_UNIT);
+        if (img_->isInitialized()) {
+            program_->setUniform("img0", [this](GLint& id) {
+                glActiveTexture(img_->getTextureUnit());
+                glBindTexture(GL_TEXTURE_2D, img_->getID());
+                glUniform1i(id, img_->getTextureUnit());
+            });
         }
-
-        program_->markUniformInUse("cap0");
-        program_->setUniform("iResolutionCap0", [this, program](GLint& id) {
-            glProgramUniform2f(program, id, (GLfloat) webcam_->getWidth(), (GLfloat) webcam_->getHeight());
+        program_->setUniform("iteration", [this, program, i](GLint& id) {
+            glProgramUniform1i(program, id, i);
         });
-    }
 
-    program_->setUniform("iResolution", [this, program](GLint& id) {
-        glProgramUniform2f(program, id, (float)size_.first, (float)size_.second);
-    });
-
-    program_->setUniform("iTime", [t, program](GLint& id) {
-        glProgramUniform1f(program, id, (float)t);
-    });
-
-    int i = 1;
-    for (const auto& joy : joysticks_) {
-        auto outs = joy->getOutputs();
-        for (const auto& kv : outs) {
-            const std::string& name = kv.first;
-            const JoystickOutput& ctrl = kv.second;
-            const std::string base = "j" + std::to_string(i) + name;
-
-            program_->setUniform(base + "Pressed", [ctrl, program](GLint& id) {
-                glProgramUniform1i(program, id, ctrl.pressed ? 1 : 0);
+        if (img_->isInitialized()) {
+            program_->setUniform("img0", [this, program](GLint& id) {
+                glActiveTexture(IMG_UNIT_GL);
+                glBindTexture(GL_TEXTURE_2D, img_->getID());
+                glUniform1i(id, 0);
             });
 
-            program_->setUniform(base + "PressedNew", [ctrl, program](GLint& id) {
-                glProgramUniform1i(program, id, ctrl.pressed_new ? 1 : 0);
-            });
-
-            program_->setUniform(base + "Time", [ctrl, program](GLint& id) {
-                glProgramUniform1f(program, id, (float)ctrl.time);
-            });
-
-            program_->setUniform(base + "TimeTotal", [ctrl, program](GLint& id) {
-                glProgramUniform1f(program, id, (float)ctrl.time_total);
-            });
-
-            program_->setUniform(base, [ctrl, program](GLint& id) {
-                glProgramUniform1f(program, id, ctrl.value);
+            program_->setUniform("iResolutionImg0", [this, program](GLint& id) {
+                glProgramUniform2f(program, id, (float)img_->getWidth(), (float)img_->getHeight());
             });
         }
 
-        i++;
+        // Read webcam
+        std::optional<GLint> webcam_loc = program_->getUniformLoc("cap0");
+        if ((program_->getUniformLoc("iResolutionCap0") || webcam_loc) && setupWebcam(0)) {
+            cv::Mat frame;
+            if (webcam_->read(frame) && webcam_loc) {
+                cv::cvtColor(frame, frame, cv::COLOR_BGR2RGB);
+                flip(frame, frame, -1);
+
+                cv::Size size = frame.size();
+
+                glActiveTexture(WEBCAM_UNIT_GL);
+                glBindTexture(GL_TEXTURE_2D, webcam_tex_);
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, size.width, size.height, 0, GL_RGB, GL_UNSIGNED_BYTE, frame.data);
+                glUniform1i(webcam_loc.value(), WEBCAM_UNIT);
+            }
+
+            program_->markUniformInUse("cap0");
+            program_->setUniform("iResolutionCap0", [this, program](GLint& id) {
+                glProgramUniform2f(program, id, (GLfloat) webcam_->getWidth(), (GLfloat) webcam_->getHeight());
+            });
+        }
+
+        program_->setUniform("iResolution", [this, program](GLint& id) {
+            glProgramUniform2f(program, id, (float)size_.first, (float)size_.second);
+        });
+
+        program_->setUniform("iTime", [t, program](GLint& id) {
+            glProgramUniform1f(program, id, (float)t);
+        });
+
+        program_->setUniform("lastOut", [this, program](GLint& id) {
+            glActiveTexture(LAST_OUTPUT_UNIT_GL);
+            glBindTexture(GL_TEXTURE_2D, output_texs_[SRC]);
+            glUniform1i(id, LAST_OUTPUT_UNIT);
+        });
+
+        program_->setUniform("firstPass", [this, program](GLint& id) {
+            glProgramUniform1i(program, id, first_pass_);
+        });
+
+        int joy_idx = 1;
+        for (const auto& joy : joysticks_) {
+            auto outs = joy->getOutputs();
+            for (const auto& kv : outs) {
+                const std::string& name = kv.first;
+                const JoystickOutput& ctrl = kv.second;
+                const std::string base = "j" + std::to_string(joy_idx) + name;
+
+                program_->setUniform(base + "Pressed", [ctrl, program](GLint& id) {
+                    glProgramUniform1i(program, id, ctrl.pressed ? 1 : 0);
+                });
+
+                program_->setUniform(base + "PressedNew", [ctrl, program](GLint& id) {
+                    glProgramUniform1i(program, id, ctrl.pressed_new ? 1 : 0);
+                });
+
+                program_->setUniform(base + "Time", [ctrl, program](GLint& id) {
+                    glProgramUniform1f(program, id, (float)ctrl.time);
+                });
+
+                program_->setUniform(base + "TimeTotal", [ctrl, program](GLint& id) {
+                    glProgramUniform1f(program, id, (float)ctrl.time_total);
+                });
+
+                program_->setUniform(base, [ctrl, program](GLint& id) {
+                    glProgramUniform1f(program, id, ctrl.value);
+                });
+            }
+
+            joy_idx++;
+        }
+
+        glViewport(0,0, size_.first, size_.second);
+
+        // Draw our vertices
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        glUseProgram(0);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        // Swap the ping pong buffer!
+        std::swap(draw_bufs_[SRC], draw_bufs_[DEST]);
+        std::swap(output_texs_[SRC], output_texs_[DEST]);
     }
-
-    glViewport(0,0, size_.first, size_.second);
-    glDrawBuffers(1, &draw_bufs_[0]);
-
-    // Draw our vertices
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-    glUseProgram(0);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    // Swap the ping pong buffer!
-    std::swap(draw_bufs_[0], draw_bufs_[1]);
-    std::swap(output_texs_[0], output_texs_[1]);
 
     // Calculate blit settings
     DrawInfo draw_info = DrawInfo::scaleCenter(
@@ -295,11 +326,9 @@ void App::draw(GLFWwindow* window, double t) {
             static_cast<float>(win_height));
 
     // Draw to the screen
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
     glDrawBuffer(GL_BACK);
-    glBindFramebuffer (GL_READ_FRAMEBUFFER, fbo_);
-    // Calculate sizing for when we draw to the screen
-    glReadBuffer(draw_bufs_[1]);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo_);
+    glReadBuffer(draw_bufs_[SRC]);
     glViewport(0,0, win_width, win_height);
     glBlitFramebuffer(
         0,0, size_.first, size_.second,
@@ -322,6 +351,8 @@ void App::draw(GLFWwindow* window, double t) {
         std::cerr << "- No More Warnings! - " << std::endl;
         last_warning_ = "";
     }
+
+    first_pass_ = false;
 }
 
 void App::onKey(GLFWwindow* window, int key, int /*scancode*/, int action, int /*mods*/) {
@@ -348,3 +379,6 @@ void App::onError(int /* error */, const char* desc) {
 
 #undef WEBCAM_UNIT
 #undef IMG_UNIT
+#undef LAST_OUTPUT_UNIT
+#undef SRC
+#undef DEST

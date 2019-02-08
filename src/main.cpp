@@ -9,7 +9,7 @@
 #include "App.h"
 #include "Joystick.h"
 
-#define BENCHMARK
+// #define BENCHMARK
 
 std::unique_ptr<App> app;
 
@@ -50,8 +50,9 @@ int main(int argc, char** argv) {
     TCLAP::ValueArg<std::string> out_arg("", "out-dir", "path to output directory", false, ".", "string", cmd);
     TCLAP::MultiArg<std::string> joy_arg("j", "joystick", "path to joystick configuration", false, "string", cmd);
     TCLAP::ValueArg<std::string> res_arg("r", "resolution", "Resolution in the format axb where 'a' is with and 'b' is height", false, "1280x720", "string", cmd);
-    TCLAP::ValueArg<std::string> window_arg("w", "window", "Window size in the format axb where 'a' is with and 'b' is height", false, "1280x720", "string", cmd);
+    TCLAP::ValueArg<std::string> window_arg("s", "screen", "Window size in the format axb where 'a' is with and 'b' is height", false, "1280x720", "string", cmd);
     TCLAP::ValueArg<std::string> img_arg("i", "img", "texture image path", false, "", "string", cmd);
+    TCLAP::ValueArg<int> loop_arg("l", "loop", "apply shader X times and set iteration uniform", false, 1, "int", cmd);
 
     try {
         cmd.parse(argc, argv);
@@ -104,7 +105,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    app = std::make_unique<App>(out_dir, std::make_pair(res.first, res.second));
+    app = std::make_unique<App>(out_dir, std::make_pair(res.first, res.second), loop_arg.getValue());
 
     glfwSetErrorCallback(onError);
     if (!glfwInit()) {

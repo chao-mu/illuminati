@@ -17,7 +17,7 @@
 
 class App {
     public:
-        App(const std::filesystem::path& out_dir, std::pair<int, int> size);
+        App(const std::filesystem::path& out_dir, std::pair<int, int> size, int repeat);
         Error setup(std::filesystem::path vert_path, std::filesystem::path frag_path, std::vector<std::shared_ptr<Joystick>> joysticks, std::filesystem::path& path);
         void draw(GLFWwindow* window, double t);
         void onError(int error, const char* desc);
@@ -35,7 +35,8 @@ class App {
         GLuint fbo_ = GL_FALSE;
 
         GLuint output_texs_[2] = {};
-        GLenum draw_bufs_[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+        GLuint draw_bufs_[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+        int currentActiveBuffer = 0;
 
         std::unique_ptr<Image> img_;
         std::unique_ptr<ShaderProgram> program_;
@@ -46,7 +47,8 @@ class App {
         const std::filesystem::path out_dir_;
         std::unique_ptr<Webcam> webcam_;
         std::pair<int, int> size_;
-
+        bool first_pass_ = true;
+        int repeat_;
 };
 
 #endif

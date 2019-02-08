@@ -30,11 +30,11 @@ Error App::screenshot() {
     s << "output-" << std::put_time(std::localtime(&now), "%Y-%m-%d_") << ms << ".png";
     std::filesystem::path dest = out_dir_ / s.str();
 
-    int width = size_.first;
-    int height = size_.second;
+    unsigned int width = size_.first;
+    unsigned int height = size_.second;
 
     glBindFramebuffer(GL_FRAMEBUFFER, fbo_);
-    GLsizei pixels = width * height;
+    size_t  pixels = width * height;
     std::vector<unsigned char> image(pixels * 4);
     glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, &image[0]);
 
@@ -203,7 +203,7 @@ void App::draw(GLFWwindow* window, double t) {
     glUseProgram(program);
 
     if (img_->isInitialized()) {
-        program_->setUniform("img0", [this, program](GLint& id) {
+        program_->setUniform("img0", [this](GLint& id) {
             glActiveTexture(img_->getTextureUnit());
             glBindTexture(GL_TEXTURE_2D, img_->getID());
             glUniform1i(id, img_->getTextureUnit());

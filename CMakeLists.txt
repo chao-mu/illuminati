@@ -12,21 +12,24 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 add_executable(demo src/main.cpp src/App.cpp src/MathUtil.cpp src/JoystickManager.cpp src/Joystick.cpp src/Result.cpp src/ShaderProgram.cpp src/Webcam.cpp src/Image.cpp)
 target_include_directories(demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} "${CMAKE_SOURCE_DIR}/thirdparty/lodepng")
 target_compile_options(demo PRIVATE "-Wextra" "-Werror" "-Wall" "-pedantic-errors" "-Wconversion")
+
 target_link_libraries(demo stdc++fs)
+target_link_libraries(demo stdc++experimental)
 
 # LodePNG
 add_subdirectory("${CMAKE_SOURCE_DIR}/thirdparty/lodepng")
 target_link_libraries(demo lodepng)
 
 # OpenGL
-find_package(OpenGL REQUIRED COMPONENTS OpenGL)
-target_link_libraries(demo OpenGL::OpenGL)
-add_dependencies(demo OpenGL::OpenGL)
+find_package(OpenGL REQUIRED)
+target_link_libraries(demo ${OPENGL_LIBRARIES})
+target_link_libraries(demo ${OPENGL_INCLUDE_DIRS})
 
 # OpenGL - GLFW
 find_package(glfw3 3.2 REQUIRED)
 target_link_libraries(demo glfw ${GLFW_LIBRARIES}) 
 # OpenGL - GLEW
+
 find_package(GLEW REQUIRED)
 include_directories(${GLEW_INCLUDE_DIRS})
 target_link_libraries(demo ${GLEW_LIBRARIES})

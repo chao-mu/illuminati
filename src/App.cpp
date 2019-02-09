@@ -25,9 +25,8 @@
 #define SRC 0
 #define DEST 1
 
-App::App(const std::filesystem::path& out_dir, std::pair<int, int> size, int repeat)
-    : img_(new Image()), out_dir_(out_dir), size_(size), repeat_(repeat)  {}
-
+App::App(const std::filesystem::path& out_dir, Size resolution, int repeat)
+    : img_(new Image()), out_dir_(out_dir), resolution_(resolution), repeat_(repeat)  {}
 
 Error App::screenshot() {
     std::stringstream s;
@@ -38,11 +37,10 @@ Error App::screenshot() {
     s << "output-" << std::put_time(std::localtime(&now), "%Y-%m-%d_") << ms << ".png";
     std::filesystem::path dest = out_dir_ / s.str();
 
-    unsigned int width = size_.first;
-    unsigned int height = size_.second;
-
     glBindFramebuffer(GL_FRAMEBUFFER, fbo_);
-    size_t  pixels = width * height;
+    int width = resolution_.getWidth<int>();
+    int height = resolution_.getHeight<int>();;
+    unsigned pixels = resolution_.getWidth<unsigned int>() * resolution_.getHeight<unsigned int>();
     std::vector<unsigned char> image(pixels * 4);
     glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, &image[0]);
 
@@ -55,7 +53,12 @@ Error App::screenshot() {
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    unsigned errc = lodepng::encode(dest, flipped, width, height);
+    unsigned errc = lodepng::encode(
+        dest,
+        flipped,
+        resolution_.getWidth<unsigned int>(),
+        resolution_.getHeight<unsigned int>()
+    );
     if (errc) {
         return "encoder error " + std::to_string(errc) + ": "+ lodepng_error_text(errc);
     }
@@ -168,7 +171,7 @@ std::optional<std::string> App::setup(
         glBindTexture(GL_TEXTURE_2D, id);
 
         // Give an empty image to OpenGL ( the last "0" )
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size_.first, size_.second, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, resolution_.getWidth<GLsizei>(), resolution_.getHeight<GLsizei>(), 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glBindTexture(GL_TEXTURE_2D, 0);
@@ -218,19 +221,20 @@ void App::draw(GLFWwindow* window, double t) {
                 glUniform1i(id, img_->getTextureUnit());
             });
         }
-        program_->setUniform("iteration", [this, program, i](GLint& id) {
+        program_->setUniform("iteration", [program, i](GLint& id) {
             glProgramUniform1i(program, id, i);
         });
 
         if (img_->isInitialized()) {
-            program_->setUniform("img0", [this, program](GLint& id) {
+            program_->setUniform("img0", [this](GLint& id) {
                 glActiveTexture(IMG_UNIT_GL);
                 glBindTexture(GL_TEXTURE_2D, img_->getID());
                 glUniform1i(id, 0);
             });
 
             program_->setUniform("iResolutionImg0", [this, program](GLint& id) {
-                glProgramUniform2f(program, id, (float)img_->getWidth(), (float)img_->getHeight());
+                Size img_size = img_->getSize(); 
+                glProgramUniform2f(program, id, img_size.getWidth<float>(), img_size.getHeight<float>());
             });
         }
 
@@ -257,14 +261,14 @@ void App::draw(GLFWwindow* window, double t) {
         }
 
         program_->setUniform("iResolution", [this, program](GLint& id) {
-            glProgramUniform2f(program, id, (float)size_.first, (float)size_.second);
+            glProgramUniform2f(program, id, resolution_.getWidth<float>(), resolution_.getHeight<float>());
         });
 
         program_->setUniform("iTime", [t, program](GLint& id) {
             glProgramUniform1f(program, id, (float)t);
         });
 
-        program_->setUniform("lastOut", [this, program](GLint& id) {
+        program_->setUniform("lastOut", [this](GLint& id) {
             glActiveTexture(LAST_OUTPUT_UNIT_GL);
             glBindTexture(GL_TEXTURE_2D, output_texs_[SRC]);
             glUniform1i(id, LAST_OUTPUT_UNIT);
@@ -306,7 +310,7 @@ void App::draw(GLFWwindow* window, double t) {
             joy_idx++;
         }
 
-        glViewport(0,0, size_.first, size_.second);
+        glViewport(0,0, resolution_.getWidth<GLsizei>(), resolution_.getHeight<GLsizei>());
 
         // Draw our vertices
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
@@ -320,8 +324,8 @@ void App::draw(GLFWwindow* window, double t) {
 
     // Calculate blit settings
     DrawInfo draw_info = DrawInfo::scaleCenter(
-            static_cast<float>(size_.first),
-            static_cast<float>(size_.second),
+            resolution_.getWidth<float>(),
+            resolution_.getHeight<float>(),
             static_cast<float>(win_width),
             static_cast<float>(win_height));
 
@@ -331,7 +335,7 @@ void App::draw(GLFWwindow* window, double t) {
     glReadBuffer(draw_bufs_[SRC]);
     glViewport(0,0, win_width, win_height);
     glBlitFramebuffer(
-        0,0, size_.first, size_.second,
+        0,0, resolution_.getWidth<GLsizei>(), resolution_.getHeight<GLsizei>(),
         draw_info.x0, draw_info.y0, draw_info.x1, draw_info.y1,
         GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT,
         GL_NEAREST

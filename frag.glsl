@@ -12,13 +12,7 @@ uniform bool firstPass;
 in vec2 texcoord;
 
 void main() {
-    vec3 col = vec3(0);
-    if (firstPass) {
-        col = vec3(1, 0, 0);
-    } else {
-        col = texture(lastOut, texcoord).rgb;
-        col += .5;
-    }
+    vec3 col = vec3(1);
     
     FragColor.rgb = col;
     FragColor.a = 1;

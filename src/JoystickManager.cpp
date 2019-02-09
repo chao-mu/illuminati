@@ -1,5 +1,7 @@
 #include "JoystickManager.h"
 
+#include <vector>
+
 #include "GLFW/glfw3.h"
 
 void JoystickManager::update() {

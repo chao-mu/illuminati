@@ -41,7 +41,7 @@ Error ShaderProgram::loadShader(GLenum type, const std::string& path) {
     if (!status) {
         GLint log_length = 0;
         glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &log_length);
-        std::vector<char> v(log_length);
+        std::vector<char> v(static_cast<size_t>(log_length));
         glGetShaderInfoLog(shader, log_length, NULL, v.data());
 
         std::ostringstream err;
@@ -137,7 +137,7 @@ Error ShaderProgram::update() {
         if (!status) {
             GLint log_length = 0;
             glGetProgramiv(next_prog, GL_INFO_LOG_LENGTH, &log_length);
-            std::vector<char> v(log_length);
+            std::vector<char> v(static_cast<size_t>(log_length));
             glGetProgramInfoLog(next_prog, log_length, NULL, v.data());
             std::ostringstream err;
             err << "Error linking shader program: \n" << std::string(begin(v), end(v));
@@ -152,7 +152,7 @@ Error ShaderProgram::update() {
         uniforms_.clear();
         for (GLuint i = 0; i < (GLuint)count; i++)
         {
-            std::vector<GLchar> name(uni_name_len);
+            std::vector<GLchar> name(static_cast<size_t>(uni_name_len));
 
             GLsizei length;
             GLint size;

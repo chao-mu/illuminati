@@ -8,6 +8,7 @@
 
 #include "App.h"
 #include "Joystick.h"
+#include "Size.h"
 
 // #define BENCHMARK
 
@@ -25,23 +26,6 @@ static void onKey(GLFWwindow* window, int key, int scancode, int action, int mod
     app->onKey(window, key, scancode, action, mods);
 }
 
-std::optional<std::pair<int, int>> parseRes(const std::string& s) {
-    size_t x = s.find("x");
-    if (x == std::string::npos) {
-        return {};
-    }
-
-    int w, h;
-    try {
-       w = std::stoi(s.substr(0, x));
-       h = std::stoi(s.substr(x + 1));
-    } catch (std::invalid_argument& e) {
-        return {};
-    }
-
-    return std::make_pair(w, h);
-}
-
 int main(int argc, char** argv) {
     TCLAP::CmdLine cmd("Illuminati - Everything is Light");
 
@@ -50,7 +34,7 @@ int main(int argc, char** argv) {
     TCLAP::ValueArg<std::string> out_arg("", "out-dir", "path to output directory", false, ".", "string", cmd);
     TCLAP::MultiArg<std::string> joy_arg("j", "joystick", "path to joystick configuration", false, "string", cmd);
     TCLAP::ValueArg<std::string> res_arg("r", "resolution", "Resolution in the format axb where 'a' is with and 'b' is height", false, "1280x720", "string", cmd);
-    TCLAP::ValueArg<std::string> window_arg("s", "screen", "Window size in the format axb where 'a' is with and 'b' is height", false, "1280x720", "string", cmd);
+    TCLAP::ValueArg<std::string> window_arg("w", "window", "Window size in the format axb where 'a' is width and 'b' is height", false, "1280x720", "string", cmd);
     TCLAP::ValueArg<std::string> img_arg("i", "img", "texture image path", false, "", "string", cmd);
     TCLAP::ValueArg<int> loop_arg("l", "loop", "apply shader X times and set iteration uniform", false, 1, "int", cmd);
 
@@ -61,21 +45,19 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    std::optional<std::pair<int, int>> res_opt = parseRes(res_arg.getValue());
-    std::pair<int, int> res;
-    if (res_opt) {
-        res = res_opt.value();
-    } else {
-        std::cerr << "error parsing resolution argument, was expecting format axb e.g. 1080x720" << std::endl;
+    Size resolution;
+    try {
+        resolution.set(res_arg.getValue());
+    } catch (std::invalid_argument& e) {
+        std::cerr << "error parsing resolution argument (example 1080x720): " << e.what() << std::endl;
         return 1;
     }
 
-    std::optional<std::pair<int, int>> window_res_opt = parseRes(window_arg.getValue());
-    std::pair<int, int> window_res;
-    if (window_res_opt) {
-        window_res = window_res_opt.value();
-    } else {
-        std::cerr << "error parsing screen resolution argument, was expecting format axb e.g. 1080x720" << std::endl;
+    Size window_size;
+    try {
+        window_size.set(window_arg.getValue());
+    } catch (std::invalid_argument& e) {
+        std::cerr << "error parsing resolution argument (example 1080x720): " << e.what() << std::endl;
         return 1;
     }
 
@@ -105,7 +87,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    app = std::make_unique<App>(out_dir, std::make_pair(res.first, res.second), loop_arg.getValue());
+    app = std::make_unique<App>(out_dir, resolution, loop_arg.getValue());
 
     glfwSetErrorCallback(onError);
     if (!glfwInit()) {
@@ -113,7 +95,12 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    GLFWwindow* window = glfwCreateWindow(window_res.first, window_res.second, "Awesome Demo", NULL, NULL);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+    GLFWwindow* window = glfwCreateWindow(window_size.getWidth<int>(), window_size.getHeight<int>(), "Awesome Demo", NULL, NULL);
     if (!window) {
         glfwTerminate();
         fprintf(stderr, "Failed to create window\n");

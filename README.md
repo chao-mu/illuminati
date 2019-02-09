@@ -27,7 +27,7 @@ $ cmake ..
 $ make
 ```
 
-On MacOS, if you get complaints about the filesystem header, make sure you have llvm installed and run the cmake command with the following
+On MacOS, (assuming you installed llvm via brew) you will need to run the cmake command above like so:
 
 ```
 $ CC=/usr/local/opt/llvm/bin/clang CXX=/usr/local/opt/llvm/bin/clang++ cmake ..

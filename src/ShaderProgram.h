@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <map>
 #include <functional>
+#include <vector>
 
 #include <GL/glew.h>
 

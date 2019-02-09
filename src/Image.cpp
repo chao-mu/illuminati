@@ -4,15 +4,19 @@
 
 Error Image::setup(std::filesystem::path& path, GLenum texture_unit) {
     std::vector<unsigned char> image;
-    unsigned int errc = lodepng::decode(image, width_, height_, path);
+    unsigned int width;
+    unsigned int height;
+    unsigned int errc = lodepng::decode(image, width, height, path);
     if (errc != 0) {
         return "PNG decoder error " + std::to_string(errc) + ": "+ lodepng_error_text(errc);
     }
 
     std::vector<unsigned char> flipped;
-    for (int row = height_ - 1; row >= 0; row--) {
-        int offset = row * (width_ * 4);
-        flipped.insert(flipped.end(), image.begin() + offset, image.begin() + offset + (width_ * 4));
+    int widthi = size_.getWidth<int>();
+    int heighti = size_.getHeight<int>();
+    for (int row = heighti - 1; row >= 0; row--) {
+        int offset = row * (widthi * 4);
+        flipped.insert(flipped.end(), image.begin() + offset, image.begin() + offset + (widthi * 4));
     }
 
     if (tex_id_ == GL_FALSE) {
@@ -31,7 +35,7 @@ Error Image::setup(std::filesystem::path& path, GLenum texture_unit) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width_, height_, 0, GL_RGBA, GL_UNSIGNED_BYTE, &flipped[0]);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, widthi, heighti, 0, GL_RGBA, GL_UNSIGNED_BYTE, &flipped[0]);
     glBindTexture(GL_TEXTURE_2D, 0);
 
     glActiveTexture(prev_active);
@@ -49,12 +53,8 @@ GLenum Image::getTextureUnit() const {
     return texture_unit_;
 }
 
-unsigned int Image::getWidth() const {
-    return width_;
-}
-
-unsigned int Image::getHeight() const {
-    return height_;
+Size Image::getSize() const {
+    return size_;
 }
 
 bool Image::isInitialized() const {

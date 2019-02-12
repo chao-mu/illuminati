@@ -13,11 +13,7 @@ add_executable(${PROJECT_NAME} src/main.cpp src/App.cpp src/MathUtil.cpp src/Joy
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} "${CMAKE_SOURCE_DIR}/thirdparty/lodepng")
 target_compile_options(${PROJECT_NAME} PRIVATE "-Wextra" "-Werror" "-Wall" "-pedantic-errors" "-Wconversion")
 
-# Filesystem
-include(CheckCXXSymbolExists)
-CHECK_CXX_SYMBOL_EXISTS(std::filesystem::path::preferred_separator filesystem cxx17fs)
-
-if (LINUX)
+if (UNIX AND NOT APPLE)
     target_link_libraries(${PROJECT_NAME} stdc++fs)
 endif()
 

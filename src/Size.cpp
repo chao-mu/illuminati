@@ -2,6 +2,7 @@
 
 #include <cfloat>
 #include <climits>
+#include <stdexcept>
 
 void Size::set(const std::string& s) {
     size_t x = s.find("x");
@@ -27,7 +28,7 @@ template<typename T> void Size::assertValid(T x, const std::string& arg_name) {
         throw std::invalid_argument(arg_name + " is too large (larger than an int)");
     }
 
-    if (x > FLT_MAX) {
+    if (x > static_cast<T>(FLT_MAX)) {
         throw std::invalid_argument(arg_name + " is too large (larger than a float)");
     }
 }
@@ -44,6 +45,6 @@ void Size::set(unsigned int width, unsigned int height) {
     assertValid(width, "width");
     assertValid(height, "height");
 
-    width = width_;
-    height = height_;
+    width_ = width;
+    height_ = height;
 }

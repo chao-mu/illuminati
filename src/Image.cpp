@@ -11,6 +11,8 @@ Error Image::setup(std::filesystem::path& path, GLenum texture_unit) {
         return "PNG decoder error " + std::to_string(errc) + ": "+ lodepng_error_text(errc);
     }
 
+    size_.set(width, height);
+
     std::vector<unsigned char> flipped;
     int widthi = size_.getWidth<int>();
     int heighti = size_.getHeight<int>();
